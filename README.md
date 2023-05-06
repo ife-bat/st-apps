@@ -39,7 +39,7 @@ list of apps in the side-bar (first one below `Home`).
 ## Update the local repository in odin
 
 Log in to odin using ssh (either through a terminal or using the remote coding option in VSCode). Then go to / open
-the directory and pull changes from the [github-repository](https://github.com/ife-bat/st-apps.git repository).
+the directory and pull changes from the [github repository](https://github.com/ife-bat/st-apps.git).
 
 ```shell
 cd /usr/local/apps/st-apps
