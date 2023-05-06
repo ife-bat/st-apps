@@ -28,7 +28,7 @@ st-apps/
 
 ## Developing and testing your sub-app
 
-Assume your app is called `nice_app.py`. Put the app in the pages folder and change the name follwing this convention:
+Assume your app is called `nice_app.py`. Put the app in the `pages` folder and change the name follwing this convention:
 
 `<number>_<name>.py`
 
