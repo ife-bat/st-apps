@@ -28,13 +28,30 @@ st-apps/
 
 ## Developing and testing your sub-app
 
-Assume your app is called `nice_app.py`. Put the app in the `pages` folder and change the name follwing this convention:
+First clone (or pull recent changes from) the [github repository (ife-bat/st-apps)](https://github.com/ife-bat/st-apps.git).
+Create a python environment and install requirements if you don't already have one.
+
+Assume your app is called `my_eq_solv_v1.py`. Put the app in the `pages` folder and change the name follwing this convention:
 
 `<number>_<name>.py`
 
 The `<number>` is used to order / position the short-cut to the app in the side-bar with the label `<name>`. For example,
 if you call the file `000_Solve_equations.py`, the link `Solve equations` will most likely be put on top of the 
 list of apps in the side-bar (first one below `Home`). 
+
+You can check if it works as intended by running the multipage app locally:
+
+```shell
+# in the top directory
+streamlit run src/Home.py
+```
+
+If you want to check only your own app, point streamlit to your apps python-file.
+
+```shell
+# in the top directory
+streamlit run src/pages/000_Solve_equations.py
+```
 
 ## Update the local repository in odin
 
