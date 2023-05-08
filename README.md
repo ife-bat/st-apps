@@ -74,7 +74,7 @@ docker stop <container_id>
 
 
 # (re-) build the docker image:
-docker buld -t streamlit-apps .
+docker build -t streamlit-apps .
 
 # run the docker container using the image:
 docker run -p 8501:8501 streamlit-apps
