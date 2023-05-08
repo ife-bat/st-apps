@@ -1,4 +1,4 @@
-from ..libs import arbin_schedule_tester_lib as ast
+from libs import arbin_schedule_tester_lib as ast
 import streamlit as st
 
 cell_type_options = {"Auto" : None,
