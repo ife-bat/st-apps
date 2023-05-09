@@ -5,10 +5,10 @@ matplotlib~=3.7.0
 bokeh~=2.4.3
 scipy~=1.10.1
 openpyxl~=3.1.2
-pint~=0.21
+pint
 pyodbc~=4.0.39
-SQLAlchemy~=2.0.12
-sqlalchemy-access~=2.0.1
-xlrd~=2.0.1
-tables~=38.0
+SQLAlchemy
+sqlalchemy-access
+xlrd
+tables
 cellpy==1.0.0a6
