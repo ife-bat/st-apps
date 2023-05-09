@@ -6,18 +6,20 @@ import streamlit as st
 import cellpy
 
 
-st.title("Arbin Excel Exporter")
+st.title("Arbin Excel Exporter :sunglasses:")
 st.write("By IFE Battery Lab")
 
+settings = st.expander("Cell information", expanded=True)
+mass = settings.number_input("Mass (mg):", min_value=0.0001, max_value=5000.0, value=1.0)
+nominal_capacity = settings.number_input(
+    "Nominal capacity (mAh/g):", min_value=10.0, max_value=5000.0, value=372.0
+)
+
 raw_file = st.file_uploader("Upload raw file (*.res)", type=["res"])
-settings = st.expander("File information", expanded=True)
 
 button = st.button("Process file")
-st.write(f"Location: {os.getcwd()}")
-current_location = pathlib.Path(os.getcwd()).resolve()
-st.write(f"Current location: {current_location}")
 
-
+st.divider()
 if raw_file is not None and button:
     progress_bar = st.progress(0.0, "Reading file ...")
     raw_bytes = raw_file.read()
@@ -32,7 +34,13 @@ if raw_file is not None and button:
         f.write(raw_bytes)
 
     progress_bar.progress(0.3, "Reading file ...")
-    c = cellpy.get(tmp_raw_file, file_type="arbin_res", refuse_copying=True)
+    c = cellpy.get(
+        tmp_raw_file,
+        file_type="arbin_res",
+        mass=mass,
+        nominal_capacity=nominal_capacity,
+        refuse_copying=True,
+    )
 
     progress_bar.progress(0.5, "File is being interpreted...")
     c.to_excel(tmp_xlsx_file)
