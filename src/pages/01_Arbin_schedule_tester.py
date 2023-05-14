@@ -8,18 +8,33 @@ cell_type_options = {"Auto" : None,
                       "Full-cell with LFP" : "full_cell_LFP", 
                       "Full-cell with NMC" : "full_cell_NMC"}
 
+tester = ast.Tester()
+
+if "layout" not in st.session_state:
+    st.session_state["layout"] = "vertical"
+if "fig_width" not in st.session_state:
+    st.session_state["fig_width"] = 1100
+if "fig_height" not in st.session_state:
+    st.session_state["fig_height"] = 550
+if "new_tab" not in st.session_state:
+    st.session_state["new_tab"] = False
+
 
 st.set_page_config(layout="wide")
 st.title("Arbin schedule tester")
 st.write("By Asbjørn Ulvestad")
 
+widget = st.container()
+plotcontainer = st.container()
+plotcontainer.empty()
+
+uploaded_schedule = widget.file_uploader("Upload schedule file (*.sdu, *.sdx)", type=["sdu","sdx"])
+
 #Make settings columns
-col1, col2, col3 = st.columns(3)
+col1, col2 = widget.columns(2)
 
 #Populate main settings column
-st.session_state["setting_expander_state"] = True
-uploaded_schedule = col1.file_uploader("Upload schedule file (*.sdu, *.sdx)", type=["sdu","sdx"])
-setting_expander = col2.expander("Test parameters", expanded=False)
+setting_expander = col1.expander("Test parameters", expanded=True)
 cell_type_option = setting_expander.selectbox("Cell type:", 
                                           cell_type_options.keys())
 max_cycles = setting_expander.number_input("Number of cycles to run:", 
@@ -28,7 +43,7 @@ max_cycles = setting_expander.number_input("Number of cycles to run:",
                                            value=100)
 
 #Populate advanced settings column
-advanced_setting_expander = col3.expander("Advanced settings", expanded=False)
+advanced_setting_expander = col2.expander("Advanced settings", expanded=True)
 delta_time =  advanced_setting_expander.number_input("Delta time:", 
                                                      min_value=0.1, 
                                                      max_value=5.0, 
@@ -39,26 +54,65 @@ soc_length = advanced_setting_expander.number_input("Number of elements in thin 
                                                     max_value=100,
                                                     value=20)
 button = col1.button("Run test")
+progress_bar = widget.progress(0, "")
 
-
-if uploaded_schedule is not None and button:
+def updateplot():
+    print("Drawing figure with")
+    print("Width:", st.session_state["fig_width"])
+    print("Height", st.session_state["fig_height"])
+    print("Layout", st.session_state["layout"])
+    print("New tab", st.session_state["new_tab"])
+    if st.session_state["new_tab"]:
+        st.session_state["tester"].make_overview_bokeh(fig_width=st.session_state["fig_width"]*2, fig_height=st.session_state["fig_height"]*2, line_width=1.5, line_alpha=0.9, show_plot=True, normalize=True, vertical_stack=(st.session_state["layout"].lower()=="vertical"))
+    else:
+        plot = st.session_state["tester"].make_overview_bokeh(fig_width=st.session_state["fig_width"]*2, fig_height=st.session_state["fig_height"]*2, line_width=1.5, line_alpha=0.9, show_plot=False, normalize=True, vertical_stack=(st.session_state["layout"].lower()=="vertical"))
+        plotcontainer.bokeh_chart(plot, use_container_width=False)
+    
+if uploaded_schedule is not None and not button:
+    progress_bar.progress(0, "Ready to run...")
+if uploaded_schedule is None and button:
+    progress_bar.progress(0, "Upload schedule before running!")
+elif uploaded_schedule is not None and button:
     cellType = cell_type_options[cell_type_option]    
+    progress_bar.progress(0, "Schedule is being interpreted...")
     schedule_bytes = uploaded_schedule.read()
     schedule_text = schedule_bytes.decode('utf-8', errors="ignore")
     schedule_lines = schedule_text.splitlines()
 
-    progress_bar = st.progress(0, "Schedule is being interpreted...")
 
-    tester = ast.Tester()
     tester.set_schedule(schedule_lines=schedule_lines)
     tester.build_cell(0.002, 1.000, delta_time=delta_time, cell_type=cellType, soc_length=soc_length)
     tester.run_test(max_cycles=max_cycles, progress_bar=progress_bar)
+    
+    progress_bar.progress(1.0, "Preparing figure")
+    tester.prepare_output()
+    st.session_state["tester"] = tester
+    updateplot()
+    # plot = tester.make_overview_bokeh(fig_width=1200*2, fig_height=1200, line_width=1.5, line_alpha=0.9, show_plot=False, normalize=True, vertical_stack=True)
+    # widget.bokeh_chart(plot, use_container_width=False)
     progress_bar.progress(1.0, "Done")
 
 
-    tester.prepare_output()
-
-    plot = tester.make_overview_bokeh(fig_width=2300, fig_height=1000, line_width=1.5, line_alpha=0.9, show_plot=False, normalize=True)
-    ct = st.empty()
-    ct.bokeh_chart(plot, use_container_width=False)
-
+if 'tester' in st.session_state:
+    with widget.form("fig_params"):
+        st.write("Figure parameters")
+        subcol1, subcol2, subcol3 = st.columns(3)
+        subcol1.selectbox("Figure layout:",
+                     ["Grid",
+                     "Vertical"],
+                     index=1,
+                     key="layout")
+        subcol2.number_input("Plot width:",
+                        min_value=100,
+                        max_value=5000,
+                        value=st.session_state["fig_width"],
+                        key="fig_width")
+        subcol3.number_input("Plot height:",
+                        min_value=100,
+                        max_value=5000,
+                        value=st.session_state["fig_height"],
+                        key="fig_height")
+        st.checkbox("Open in new tab",
+                         value=False,
+                         key="new_tab")
+        st.form_submit_button("Redraw", on_click=updateplot)
