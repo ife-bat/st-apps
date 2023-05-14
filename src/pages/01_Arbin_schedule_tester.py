@@ -1,5 +1,6 @@
 from libs import arbin_schedule_tester_lib as ast
 import streamlit as st
+import bokeh.plotting as bplt
 
 cell_type_options = {"Auto" : None,
                       "Anode half-cell" : "half_cell", 
@@ -11,11 +12,11 @@ cell_type_options = {"Auto" : None,
 tester = ast.Tester()
 
 if "layout" not in st.session_state:
-    st.session_state["layout"] = "vertical"
+    st.session_state["layout"] = "grid"
 if "fig_width" not in st.session_state:
-    st.session_state["fig_width"] = 1100
+    st.session_state["fig_width"] = 850
 if "fig_height" not in st.session_state:
-    st.session_state["fig_height"] = 550
+    st.session_state["fig_height"] = 500
 if "new_tab" not in st.session_state:
     st.session_state["new_tab"] = False
 
@@ -63,7 +64,8 @@ def updateplot():
     print("Layout", st.session_state["layout"])
     print("New tab", st.session_state["new_tab"])
     if st.session_state["new_tab"]:
-        st.session_state["tester"].make_overview_bokeh(fig_width=st.session_state["fig_width"]*2, fig_height=st.session_state["fig_height"]*2, line_width=1.5, line_alpha=0.9, show_plot=True, normalize=True, vertical_stack=(st.session_state["layout"].lower()=="vertical"))
+        plot = st.session_state["tester"].make_overview_bokeh(fig_width=st.session_state["fig_width"]*2, fig_height=st.session_state["fig_height"]*2, line_width=1.5, line_alpha=0.9, show_plot=True, normalize=True, vertical_stack=(st.session_state["layout"].lower()=="vertical"))
+        bplt.show(plot)
     else:
         plot = st.session_state["tester"].make_overview_bokeh(fig_width=st.session_state["fig_width"]*2, fig_height=st.session_state["fig_height"]*2, line_width=1.5, line_alpha=0.9, show_plot=False, normalize=True, vertical_stack=(st.session_state["layout"].lower()=="vertical"))
         plotcontainer.bokeh_chart(plot, use_container_width=False)
