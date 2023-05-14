@@ -14,7 +14,7 @@ tester = ast.Tester()
 if "layout" not in st.session_state:
     st.session_state["layout"] = "grid"
 if "fig_width" not in st.session_state:
-    st.session_state["fig_width"] = 850
+    st.session_state["fig_width"] = 875
 if "fig_height" not in st.session_state:
     st.session_state["fig_height"] = 500
 if "new_tab" not in st.session_state:
@@ -102,7 +102,7 @@ if 'tester' in st.session_state:
         subcol1.selectbox("Figure layout:",
                      ["Grid",
                      "Vertical"],
-                     index=1,
+                     index=0,
                      key="layout")
         subcol2.number_input("Plot width:",
                         min_value=100,
@@ -114,7 +114,7 @@ if 'tester' in st.session_state:
                         max_value=5000,
                         value=st.session_state["fig_height"],
                         key="fig_height")
-        st.checkbox("Open in new tab",
-                         value=False,
-                         key="new_tab")
+        # st.checkbox("Open in new tab",
+        #                  value=False,
+        #                  key="new_tab")
         st.form_submit_button("Redraw", on_click=updateplot)
