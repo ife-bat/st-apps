@@ -7,19 +7,30 @@ import cellpy
 
 
 st.title("Arbin Excel Exporter :sunglasses:")
-st.write("By IFE Battery Lab")
+st.write("By Jan Petter Maehlen, IFE")
 
+
+# --- Settings ---
 settings = st.expander("Cell information", expanded=True)
+
 mass = settings.number_input("Mass (mg):", min_value=0.0001, max_value=5000.0, value=1.0)
 nominal_capacity = settings.number_input(
     "Nominal capacity (mAh/g):", min_value=10.0, max_value=5000.0, value=372.0
 )
+cycle_mode = settings.selectbox("Cycle mode:", ["anode-half-cell", "other"])
+area = settings.number_input("Area (cm2):", min_value=0.0001, max_value=5000.0, value=1.0)
 
-raw_file = st.file_uploader("Upload raw file (*.res)", type=["res"])
+# TODO: add option for selecting other file types (cellpy-files and .h5 from arbin5)
+raw_file_type = "arbin_res"
+raw_file_extension = "res"
 
+# --- Upload file ---
+raw_file = st.file_uploader(f"Upload raw file (*.{raw_file_extension})", type=[raw_file_extension])
 button = st.button("Process file")
 
 st.divider()
+
+# --- Process file ---
 if raw_file is not None and button:
     progress_bar = st.progress(0.0, "Reading file ...")
     raw_bytes = raw_file.read()
@@ -36,8 +47,10 @@ if raw_file is not None and button:
     progress_bar.progress(0.3, "Reading file ...")
     c = cellpy.get(
         tmp_raw_file,
-        file_type="arbin_res",
+        instrument=raw_file_type,
         mass=mass,
+        area=area,
+        cycle_mode=cycle_mode,
         nominal_capacity=nominal_capacity,
         refuse_copying=True,
     )
