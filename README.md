@@ -7,6 +7,8 @@ Streamlit apps for battery researchers
 ```shell
 st-apps/
      Dockerfile
+     README.md
+     requirements.txt
      src/
         Home.py
         pages/
