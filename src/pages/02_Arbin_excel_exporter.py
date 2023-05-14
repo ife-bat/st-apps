@@ -12,8 +12,9 @@ st.write("By Jan Petter Maehlen, IFE")
 
 # --- Settings ---
 settings = st.expander("Cell information", expanded=True)
-cycles = st.checkbox("Export voltage-curves:", value=False)
-raw = st.checkbox("Export raw-data:", value=False)
+cycles = st.checkbox("Export voltage-curves", value=False)
+raw = st.checkbox("Export raw-data", value=False)
+st.write(":warning: Exporting raw-data and/or cycles might take several minutes to perform.")
 nom_cap_specifics = settings.selectbox("Specific: ", ["gravimetric", "areal"])
 cycle_mode = settings.selectbox("Cycle mode:", ["anode-half-cell", "other"])
 mass = settings.number_input("Mass (mg):", min_value=0.0001, max_value=5000.0, value=1.0)
