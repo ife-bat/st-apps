@@ -12,17 +12,22 @@ st.write("By Jan Petter Maehlen, IFE")
 
 # --- Settings ---
 settings = st.expander("Cell information", expanded=True)
-
+cycles = st.checkbox("Export voltage-curves:", value=False)
+raw = st.checkbox("Export raw-data:", value=False)
+nom_cap_specifics = settings.selectbox("Specific: ", ["gravimetric", "areal"])
+cycle_mode = settings.selectbox("Cycle mode:", ["anode-half-cell", "other"])
 mass = settings.number_input("Mass (mg):", min_value=0.0001, max_value=5000.0, value=1.0)
 nominal_capacity = settings.number_input(
     "Nominal capacity (mAh/g):", min_value=10.0, max_value=5000.0, value=372.0
 )
-cycle_mode = settings.selectbox("Cycle mode:", ["anode-half-cell", "other"])
+
 area = settings.number_input("Area (cm2):", min_value=0.0001, max_value=5000.0, value=1.0)
 
 # TODO: add option for selecting other file types (cellpy-files and .h5 from arbin5)
 raw_file_type = "arbin_res"
 raw_file_extension = "res"
+
+summary_kwargs = {"nom_cap_specifics": "gravimetric"}
 
 # --- Upload file ---
 raw_file = st.file_uploader(f"Upload raw file (*.{raw_file_extension})", type=[raw_file_extension])
@@ -44,6 +49,8 @@ if raw_file is not None and button:
     with open(tmp_raw_file, "wb") as f:
         f.write(raw_bytes)
 
+    summary_kwargs["nom_cap_specifics"] = nom_cap_specifics
+
     progress_bar.progress(0.3, "Reading file ...")
     c = cellpy.get(
         tmp_raw_file,
@@ -52,11 +59,12 @@ if raw_file is not None and button:
         area=area,
         cycle_mode=cycle_mode,
         nominal_capacity=nominal_capacity,
+        summary_kwargs = summary_kwargs,
         refuse_copying=True,
     )
 
     progress_bar.progress(0.5, "File is being interpreted...")
-    c.to_excel(tmp_xlsx_file)
+    c.to_excel(tmp_xlsx_file, raw=raw, cycles=cycles)
     with open(tmp_xlsx_file, "rb") as f:
         tmp_xlsx_bytes = f.read()
 
