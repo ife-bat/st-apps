@@ -52,8 +52,9 @@ if raw_file is not None and button:
 
     summary_kwargs["nom_cap_specifics"] = nom_cap_specifics
 
-    progress_bar.progress(0.3, "Reading file ...")
-    cycle_mode = cycle_mode
+    progress_bar.progress(0.3, "Reading and processing file ...")
+
+    # TODO: split this up into two steps (read and make summary)
     c = cellpy.get(
         tmp_raw_file,
         instrument=raw_file_type,
@@ -65,8 +66,13 @@ if raw_file is not None and button:
         refuse_copying=True,
     )
 
-    progress_bar.progress(0.5, "File is being interpreted...")
+    if cycles:
+        progress_bar.progress(0.5, "Extracting cycles and converting ...")
+    else:
+        progress_bar.progress(0.5, "Converting ...")
     c.to_excel(tmp_xlsx_file, raw=raw, cycles=cycles)
+
+    progress_bar.progress(0.9, "Wrapping up ...")
     with open(tmp_xlsx_file, "rb") as f:
         tmp_xlsx_bytes = f.read()
 
