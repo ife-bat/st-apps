@@ -11,4 +11,4 @@ SQLAlchemy
 sqlalchemy-access
 xlrd
 tables
-cellpy==1.0.0a9
+cellpy==1.0.0b0
