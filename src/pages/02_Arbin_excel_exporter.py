@@ -28,41 +28,48 @@ area = settings.number_input("Area (cm2):", min_value=0.0001, max_value=5000.0, 
 raw_file_type = "arbin_res"
 raw_file_extension = "res"
 
-summary_kwargs = {"nom_cap_specifics": "gravimetric"}
-
 # --- Upload file ---
-raw_file = st.file_uploader(f"Upload raw file (*.{raw_file_extension})", type=[raw_file_extension])
-button = st.button("Process file")
+raw_file = st.file_uploader(
+    f"Upload raw file(s) (*.{raw_file_extension})", 
+    type=[raw_file_extension], 
+    accept_multiple_files=True
+)
+button = st.button("Process file(s)")
 
 st.divider()
 
 # --- Process file ---
 if raw_file is not None and button:
-    progress_bar = st.progress(0.0, "Reading file ...")
-    raw_bytes = raw_file.read()
-
-    progress_bar.progress(0.1, "Reading file ...")
-    raw_file_name = raw_file.name
     temporary_directory = pathlib.Path(tempfile.gettempdir())
-    tmp_raw_file = temporary_directory / raw_file_name
-    tmp_xlsx_file = tmp_raw_file.with_suffix(".xlsx")
+    files = [p.name for p in raw_file]
+    number_of_files = len(files)
+    delta = 0.3 / number_of_files
+    tmp_file_names = [temporary_directory / p.name for p in raw_file]
 
-    with open(tmp_raw_file, "wb") as f:
-        f.write(raw_bytes)
+    progress_bar = st.progress(0.0, "Reading file(s) ...")
 
-    summary_kwargs["nom_cap_specifics"] = nom_cap_specifics
+    tmp_xlsx_file = tmp_file_names[0].with_suffix(".xlsx")
+    if len(tmp_file_names) > 1:
+        tmp_xlsx_file = tmp_xlsx_file.with_name(tmp_xlsx_file.stem + "_and_more.xlsx")
 
-    progress_bar.progress(0.3, "Reading and processing file ...")
+    for i, (f, t) in enumerate(zip(raw_file, tmp_file_names)):
+        progress_bar.progress(i * delta, f"Reading file {i} ...")
+        raw_bytes = f.read()
+        with open(t, "wb") as b:
+            b.write(raw_bytes)
+
+    progress_bar.progress(0.4, "Processing file(s) ...")
+    tmp_file_names = sorted(tmp_file_names)
 
     # TODO: split this up into two steps (read and make summary)
     c = cellpy.get(
-        tmp_raw_file,
+        tmp_file_names,
         instrument=raw_file_type,
         mass=mass,
         area=area,
         cycle_mode=cycle_mode,
+        nom_cap_specifics=nom_cap_specifics,
         nominal_capacity=nominal_capacity,
-        summary_kwargs = summary_kwargs,
         refuse_copying=True,
     )
 
