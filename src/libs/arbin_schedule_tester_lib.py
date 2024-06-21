@@ -57,10 +57,11 @@ class ResponseFunction:
         return self.func(potential)
 
     def fast_soc_to_pot(self, soc):
-        if 'full_cell' in self.cell_type:
-            soc = -soc
+        #if 'full_cell' in self.cell_type:
+        #    soc = -soc
 
-        return_value = self.fast_soc_to_pot_array[int(soc * 100000 + 498)]
+        return_value = self.fast_soc_to_pot_array[int(np.max([np.min([soc * 100000 + 498, 100498]), 0]))]
+
 
         if 'full_cell' in self.cell_type:
             if 'NMC' in self.cell_type:
@@ -78,18 +79,29 @@ class ResponseFunction:
                 return 3.6 - return_value
 
             else:
+                if soc <= 0.001:
+                    return 0
+                elif soc >= 0.999:
+                    return 8
                 if return_value > 2.0:
                     return_value = 2.0
                 elif return_value < -3:
                     return_value = -3
-                return 4.0 - return_value * 2
+                return 3.5 - return_value
 
         else:
-            if return_value > 3:
-                return_value = 3
-            elif return_value < 0:
-                return_value = 0
-            return return_value
+            if 'XNO' in self.cell_type:
+                if return_value > 3:
+                    return_value = 3
+                elif return_value < 0:
+                    return_value = 0
+                return 1 + return_value*2
+            else:
+                if return_value > 3:
+                    return_value = 3
+                elif return_value < 0:
+                    return_value = 0
+                return return_value
 
 
 class Tester:
@@ -101,8 +113,10 @@ class Tester:
 
     def _infer_cell_type_from_schedule(self, schedule):
         half_cell_weight = 0
+        half_cell_XNO_weight = 0
         full_cell_LFP_weight = 0
         full_cell_NMC_weight = 0
+        full_cell_weight = 0
 
         for step in schedule.step_info_table:
             for limit in step[1]:
@@ -110,29 +124,40 @@ class Tester:
                     if '<' in limit['Equation0_szCompareSign']:
                         if float(limit['Equation0_szRight']) < 0.5:
                             half_cell_weight += 1
-                        elif float(limit['Equation0_szRight']) < 2.5:
+                        elif float(limit['Equation0_szRight']) < 1.8:
+                            half_cell_XNO_weight += 1
+                        elif float(limit['Equation0_szRight']) < 2.6:
                             full_cell_LFP_weight += 1
+                            full_cell_NMC_weight += 1
                         else:
                             full_cell_NMC_weight += 1
                     elif '>' in limit['Equation0_szCompareSign']:
-                        if float(limit['Equation0_szRight']) < 2.2:
+                        if float(limit['Equation0_szRight']) < 1.6:
                             half_cell_weight += 1
-                        elif float(limit['Equation0_szRight']) < 3.6:
+                        elif float(limit['Equation0_szRight']) < 2.8:
+                            half_cell_XNO_weight += 1
+                        elif float(limit['Equation0_szRight']) < 3.8:
                             full_cell_LFP_weight += 1
-                        else:
+                        elif float(limit['Equation0_szRight']) < 4.6:
                             full_cell_NMC_weight += 1
+                        else:
+                            full_cell_weight += 5
 
         print("Cell type inferrence from schedule:")
         print("Half cell:", half_cell_weight)
         print("Full cell LFP:", full_cell_LFP_weight)
         print("Full cell NMC:", full_cell_NMC_weight)
         
-        if half_cell_weight > max(full_cell_NMC_weight, full_cell_LFP_weight):
+        if half_cell_weight > max(half_cell_XNO_weight, full_cell_NMC_weight, full_cell_LFP_weight, full_cell_weight):
             return 'half_cell'
-        elif full_cell_LFP_weight > full_cell_NMC_weight:
+        if half_cell_XNO_weight > max(full_cell_NMC_weight, full_cell_LFP_weight, full_cell_weight):
+            return 'half_cell_XNO'
+        elif full_cell_LFP_weight > max(full_cell_NMC_weight, full_cell_weight):
             return 'full_cell_LFP'
+        elif full_cell_NMC_weight > full_cell_weight:
+            return 'full_cell_NMC'
         else: 
-            return 'full_cell_NMC'  
+            return 'full_cell'  
 
     def set_schedule(self, filename = None, schedule_lines = None):
         if filename is not None:
@@ -149,8 +174,8 @@ class Tester:
             cell_type = self.inferred_cell_type_from_schedule            
         self.cell = Cell(delta_time, cell_type, mass, specific_capacity, soc_length=soc_length)
 
-    def run_test(self, max_cycles=100, progress_bar = None):
-        self.schedule.run_cell(self.cell, max_cycles, progress_bar=progress_bar)
+    def run_test(self, max_cycles=100, progress_bar = None, timeout = None):
+        self.schedule.run_cell(self.cell, max_cycles, progress_bar=progress_bar, timeout = timeout)
 
     def prepare_output(self):
         self.output = pd.DataFrame(self.cell.log, columns=[*self.cell.current_state.keys()])
@@ -294,7 +319,7 @@ class Schedule:
         for stepinfo in self.step_info_table:
             self.steps.append(Step(stepinfo, self.formulas))
 
-    def run_cell(self, cell, max_cycles, progress_bar = None):
+    def run_cell(self, cell, max_cycles, progress_bar = None, timeout = 1e100):
         self.current_step = self.steps[0]
         self.update_formula_values_and_limits(cell)
 
@@ -302,8 +327,8 @@ class Schedule:
 
         while not (
                 go_to == "End Test" or (go_to == "Next Step" and self.current_step is self.steps[-1]) or
-                cell.current_state[
-                    "PV_CHAN_Cycle_Index"] > max_cycles):
+                cell.current_state["PV_CHAN_Cycle_Index"] > max_cycles or
+                cell.current_state["PV_CHAN_Test_Time"] > timeout):
             if go_to == "Next Step":
                 self.current_step = self.steps[self.steps.index(self.current_step) + 1]
             else:
@@ -314,7 +339,7 @@ class Schedule:
             self.update_formula_values_and_limits(cell)
             
             if progress_bar is not None:
-                progress_bar.progress(1.0 * cell.current_state["PV_CHAN_Cycle_Index"] / max_cycles, f"Schedule running... ({cell.current_state['PV_CHAN_Cycle_Index']}/{max_cycles})")
+                progress_bar.progress(1.0 * cell.current_state["PV_CHAN_Cycle_Index"] / max_cycles, f"Schedule running... (Cycle {cell.current_state['PV_CHAN_Cycle_Index']}/{max_cycles}, step {cell.current_state['PV_CHAN_Step_Index']})")
 
             go_to = self.current_step.execute(cell)
 

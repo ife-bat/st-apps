@@ -3,7 +3,8 @@ import streamlit as st
 import bokeh.plotting as bplt
 
 cell_type_options = {"Auto" : None,
-                      "Anode half-cell" : "half_cell", 
+                      "Anode half-cell Si/G" : "half_cell", 
+                      "Anode half-cell XNO/LTO" : "half_cell_XNO", 
                       "Cathode half-cell LFP" : "full_cell_LFP", 
                       "Cathode half-cell NMC" : "full_cell_NMC", 
                       "Full-cell with LFP" : "full_cell_LFP", 
@@ -54,6 +55,13 @@ soc_length = advanced_setting_expander.number_input("Number of elements in thin 
                                                     min_value=5,
                                                     max_value=100,
                                                     value=20)
+
+timeout = advanced_setting_expander.number_input("Timeout (days):", 
+                                                     min_value=1,
+                                                     max_value=1000, 
+                                                     value=50,
+                                                     )
+
 button = col1.button("Run test")
 progress_bar = widget.progress(0, "")
 
@@ -84,7 +92,7 @@ elif uploaded_schedule is not None and button:
 
     tester.set_schedule(schedule_lines=schedule_lines)
     tester.build_cell(0.002, 1.000, delta_time=delta_time, cell_type=cellType, soc_length=soc_length)
-    tester.run_test(max_cycles=max_cycles, progress_bar=progress_bar)
+    tester.run_test(max_cycles=max_cycles, progress_bar=progress_bar, timeout=timeout*3600*24)
     
     progress_bar.progress(1.0, "Preparing figure")
     tester.prepare_output()
