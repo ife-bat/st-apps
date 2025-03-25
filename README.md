@@ -87,3 +87,4 @@ docker run -d -p 8501:8501 streamlit-apps
 
 1. Split requirements into two files - one that contains the packages we believe will (almost) never change, and one for the others. This will speed up building the Docker container.
 2. Use docker compose (create `docker-compose.yml`)
+3. Put it into systemctl
