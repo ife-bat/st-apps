@@ -2,14 +2,13 @@ from libs import arbin_schedule_tester_lib as ast
 import streamlit as st
 import bokeh.plotting as bplt
 
-cell_type_options = {
-    "Auto": None,
-    "Anode half-cell": "half_cell",
-    "Cathode half-cell LFP": "full_cell_LFP",
-    "Cathode half-cell NMC": "full_cell_NMC",
-    "Full-cell with LFP": "full_cell_LFP",
-    "Full-cell with NMC": "full_cell_NMC",
-}
+cell_type_options = {"Auto" : None,
+                      "Anode half-cell Si/G" : "half_cell", 
+                      "Anode half-cell XNO/LTO" : "half_cell_XNO", 
+                      "Cathode half-cell LFP" : "full_cell_LFP", 
+                      "Cathode half-cell NMC" : "full_cell_NMC", 
+                      "Full-cell with LFP" : "full_cell_LFP", 
+                      "Full-cell with NMC" : "full_cell_NMC"}
 
 tester = ast.Tester()
 
@@ -47,15 +46,22 @@ max_cycles = setting_expander.number_input(
 
 # Populate advanced settings column
 advanced_setting_expander = col2.expander("Advanced settings", expanded=True)
-delta_time = advanced_setting_expander.number_input(
-    "Delta time:",
-    min_value=0.1,
-    max_value=5.0,
-    value=1.0,
-)
-soc_length = advanced_setting_expander.number_input(
-    "Number of elements in thin film model:", min_value=5, max_value=100, value=20
-)
+delta_time =  advanced_setting_expander.number_input("Delta time:", 
+                                                     min_value=0.1, 
+                                                     max_value=5.0, 
+                                                     value=1.0,
+                                                     )
+soc_length = advanced_setting_expander.number_input("Number of elements in thin film model:",
+                                                    min_value=5,
+                                                    max_value=100,
+                                                    value=20)
+
+timeout = advanced_setting_expander.number_input("Timeout (days):", 
+                                                     min_value=1,
+                                                     max_value=1000, 
+                                                     value=50,
+                                                     )
+
 button = col1.button("Run test")
 progress_bar = widget.progress(0, "")
 
@@ -102,11 +108,9 @@ elif uploaded_schedule is not None and button:
     schedule_lines = schedule_text.splitlines()
 
     tester.set_schedule(schedule_lines=schedule_lines)
-    tester.build_cell(
-        0.002, 1.000, delta_time=delta_time, cell_type=cellType, soc_length=soc_length
-    )
-    tester.run_test(max_cycles=max_cycles, progress_bar=progress_bar)
-
+    tester.build_cell(0.002, 1.000, delta_time=delta_time, cell_type=cellType, soc_length=soc_length)
+    tester.run_test(max_cycles=max_cycles, progress_bar=progress_bar, timeout=timeout*3600*24)
+    
     progress_bar.progress(1.0, "Preparing figure")
     tester.prepare_output()
     st.session_state["tester"] = tester
