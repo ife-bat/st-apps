@@ -72,7 +72,13 @@ class ResponseFunction:
 
 
         if "full_cell" in self.cell_type:
-            if "NMC" in self.cell_type:
+            if "LNMO" in self.cell_type:
+                if return_value > 2.0:
+                    return_value = 2.00
+                elif return_value < -3:
+                    return_value = -3
+                return 5.5 - return_value * 3
+            elif "NMC" in self.cell_type:
                 if return_value > 2.25:
                     return_value = 2.25
                 elif return_value < -3:

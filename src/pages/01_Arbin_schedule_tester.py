@@ -8,7 +8,9 @@ cell_type_options = {"Auto" : None,
                       "Cathode half-cell LFP" : "full_cell_LFP", 
                       "Cathode half-cell NMC" : "full_cell_NMC", 
                       "Full-cell with LFP" : "full_cell_LFP", 
-                      "Full-cell with NMC" : "full_cell_NMC"}
+                      "Full-cell with NMC" : "full_cell_NMC",
+                      "Full-cell with LNMO" : "full_cell_LNMO"
+                        }
 
 tester = ast.Tester()
 
