@@ -15,7 +15,6 @@ from bokeh.io import output_file, show
 from bokeh.layouts import gridplot
 from bokeh.plotting import figure
 import bokeh.palettes as palettes
-import matplotlib.pyplot as plt
 
 
 
@@ -56,10 +55,10 @@ class ResponseFunction:
         #        x = [i*1./100000 for i in range(1,100001)]
         x = np.linspace(0, 1, 100001)
         y = self._direct_soc_to_pot(x)
-        fig = plt.figure()
-        ax = fig.add_subplot()
-        ax.plot(x, y)
-        plt.pause(.001)
+        # fig = plt.figure()
+        # ax = fig.add_subplot()
+        # ax.plot(x, y)
+        # plt.pause(.001)
         self.func = interp1d(y, x)
 
     def init_fast_soc_to_pot(self):
@@ -730,10 +729,6 @@ class Cell:
             "MV_Mass": self.mass,
             "MV_SpecificCapacity": self.specificCapacity,
         }
-
-        self.fig_state = plt.figure()
-        self.ax_state = self.fig_state.add_subplot()
-        self.counter = 0
         
     def increment_time(self):
         self.current_state["PV_CHAN_Test_Time"] += self.delta_time
