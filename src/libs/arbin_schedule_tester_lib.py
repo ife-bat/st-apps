@@ -14,28 +14,28 @@ from scipy.interpolate import interp1d
 from bokeh.io import output_file, show
 from bokeh.layouts import gridplot
 from bokeh.plotting import figure
-from bokeh.models import NumeralTickFormatter
 import bokeh.palettes as palettes
-import io
+import matplotlib.pyplot as plt
+
 
 
 class ResponseFunction:
-    def __init__(self, cell_type="half_cell"):
+    def __init__(self, cycling_window = [0,1]):
         self.func = None
-        self.cell_type = cell_type
+        self.cycling_window = cycling_window
         self.init_pot_to_soc()
         self.fast_soc_to_pot_array = []
         self.init_fast_soc_to_pot()
+
+        self.counter = 0
 
     def _direct_soc_to_pot(self, soc):
         # pot = 0.0005/SOC -4.76*np.power(SOC,6) + 9.34*np.power(SOC,5) - 1.8*np.power(SOC,4) - 7.13*np.power(SOC,3) +
         # 5.8*np.power(SOC,2) - 1.94*SOC + 0.82 + (-(0.2/(1.0001-np.power(SOC,1000))))
 
-        if self.cell_type == "full_cell_LFP_nadadadadadada":
-            # return (3.2-0.2*soc - 200*np.power(soc-0.46, 9) - 5e5*np.power(soc-0.483624, 21) - 6e30*np.power(soc-0.5, 101))
-            pass
-        else:
-            return (
+        soc = 1-soc
+
+        potential = (
                 0.0000002975 * np.power(soc + 0.005, -3)
                 - 4.76 * np.power(soc, 6)
                 + 9.34 * np.power(soc, 5)
@@ -45,20 +45,25 @@ class ResponseFunction:
                 - 1.94 * soc
                 + 0.82
                 - 0.2
-                - (0.0000000001 / (np.power((1.005 - soc), 4)))
-            )
-        # return  pot.clip(0.0, 3.0)
+                - (0.0000000001 / (np.power((1.003 - soc), 4)))
+        )
+
+        potential = self.cycling_window[0] + (self.cycling_window[1] - self.cycling_window[0]) * potential
+        return potential 
+    
 
     def init_pot_to_soc(self):
         #        x = [i*1./100000 for i in range(1,100001)]
-        x = np.linspace(0, 100000, 100000) / 100000
+        x = np.linspace(0, 1, 100001)
         y = self._direct_soc_to_pot(x)
-        # import matplotlib.pyplot as plt
-        # plt.plot(x, y)
+        fig = plt.figure()
+        ax = fig.add_subplot()
+        ax.plot(x, y)
+        plt.pause(.001)
         self.func = interp1d(y, x)
 
     def init_fast_soc_to_pot(self):
-        x = np.linspace(-499, 100500, 100999) / 100000
+        x = np.linspace(0, 100000, 100001) / 100000
         self.fast_soc_to_pot_array = self._direct_soc_to_pot(x)
 
     def pot_to_soc(self, potential):
@@ -68,54 +73,14 @@ class ResponseFunction:
         #if 'full_cell' in self.cell_type:
         #    soc = -soc
 
-        return_value = self.fast_soc_to_pot_array[int(np.max([np.min([soc * 100000 + 498, 100498]), 0]))]
+        return_value = self.fast_soc_to_pot_array[int(np.max([np.min([soc*100000, 100000]), 0]))]
 
-
-        if "full_cell" in self.cell_type:
-            if "LNMO" in self.cell_type:
-                if return_value > 2.0:
-                    return_value = 2.00
-                elif return_value < -3:
-                    return_value = -3
-                return 5.5 - return_value * 3
-            elif "NMC" in self.cell_type:
-                if return_value > 2.25:
-                    return_value = 2.25
-                elif return_value < -3:
-                    return_value = -3
-                return 4.5 - return_value * 2
-
-            elif "LFP" in self.cell_type:
-                if return_value > 3.6:
-                    return_value = 3.6
-                elif return_value < -3.6:
-                    return_value = -3.6
-                return 3.6 - return_value
-
-            else:
-                if soc <= 0.001:
-                    return 0
-                elif soc >= 0.999:
-                    return 8
-                if return_value > 2.0:
-                    return_value = 2.0
-                elif return_value < -3:
-                    return_value = -3
-                return 3.5 - return_value
-
-        else:
-            if 'XNO' in self.cell_type:
-                if return_value > 3:
-                    return_value = 3
-                elif return_value < 0:
-                    return_value = 0
-                return 1 + return_value*2
-            else:
-                if return_value > 3:
-                    return_value = 3
-                elif return_value < 0:
-                    return_value = 0
-                return return_value
+        # if self.counter > 1000:
+        #     print("SOC:", soc, "Pot:", return_value)
+        #     self.counter = 0
+        # else:
+        #     self.counter += 1
+        return return_value
 
 
 class Tester:
@@ -123,58 +88,23 @@ class Tester:
         self.schedule = Schedule()
         self.cell = None
         self.output = None
-        self.inferred_cell_type_from_schedule = None
-
-    def _infer_cell_type_from_schedule(self, schedule):
-        half_cell_weight = 0
-        half_cell_XNO_weight = 0
-        full_cell_LFP_weight = 0
-        full_cell_NMC_weight = 0
-        full_cell_weight = 0
-
+        self.inferred_cycling_window_from_schedule = None
+       
+    def _infer_cycling_window_from_schedule(self, schedule):
+        cutoffs = []
         for step in schedule.step_info_table:
             for limit in step[1]:
                 if (
                     limit["m_bStepLimit"] == "1"
                     and limit["Equation0_szLeft"] == "PV_CHAN_Voltage"
                 ):
-                    if "<" in limit["Equation0_szCompareSign"]:
-                        if float(limit["Equation0_szRight"]) < 0.5:
-                            half_cell_weight += 1
-                        elif float(limit['Equation0_szRight']) < 1.8:
-                            half_cell_XNO_weight += 1
-                        elif float(limit['Equation0_szRight']) < 2.6:
-                            full_cell_LFP_weight += 1
-                            full_cell_NMC_weight += 1
-                        else:
-                            full_cell_NMC_weight += 1
-                    elif '>' in limit['Equation0_szCompareSign']:
-                        if float(limit['Equation0_szRight']) < 1.6:
-                            half_cell_weight += 1
-                        elif float(limit['Equation0_szRight']) < 2.8:
-                            half_cell_XNO_weight += 1
-                        elif float(limit['Equation0_szRight']) < 3.8:
-                            full_cell_LFP_weight += 1
-                        elif float(limit['Equation0_szRight']) < 4.6:
-                            full_cell_NMC_weight += 1
-                        else:
-                            full_cell_weight += 5
+                    cutoffs.append(float(limit["Equation0_szRight"]))
 
-        print("Cell type inferrence from schedule:")
-        print("Half cell:", half_cell_weight)
-        print("Full cell LFP:", full_cell_LFP_weight)
-        print("Full cell NMC:", full_cell_NMC_weight)
+        cycling_window = [min(cutoffs), max(cutoffs)]
+        print("Infered cycling window from schedule:", cycling_window)
         
-        if half_cell_weight > max(half_cell_XNO_weight, full_cell_NMC_weight, full_cell_LFP_weight, full_cell_weight):
-            return 'half_cell'
-        if half_cell_XNO_weight > max(full_cell_NMC_weight, full_cell_LFP_weight, full_cell_weight):
-            return 'half_cell_XNO'
-        elif full_cell_LFP_weight > max(full_cell_NMC_weight, full_cell_weight):
-            return 'full_cell_LFP'
-        elif full_cell_NMC_weight > full_cell_weight:
-            return 'full_cell_NMC'
-        else: 
-            return 'full_cell'  
+        return cycling_window
+
 
     def set_schedule(self, filename=None, schedule_lines=None):
         if filename is not None:
@@ -184,7 +114,7 @@ class Tester:
             self.schedule.read_schedule(schedule_lines)
 
         self.schedule.build_schedule()
-        self.inferred_cell_type_from_schedule = self._infer_cell_type_from_schedule(
+        self.inferred_cycling_window_from_schedule = self._infer_cycling_window_from_schedule(
             self.schedule
         )
 
@@ -193,13 +123,14 @@ class Tester:
         mass=0.002,
         specific_capacity=1.000,
         delta_time=1,
-        cell_type=None,
+        cycling_window=None,
         soc_length=10,
+        initial_soc_state=1
     ):
-        if cell_type == None:
-            cell_type = self.inferred_cell_type_from_schedule
+        if cycling_window is None:
+            cycling_window = self.inferred_cycling_window_from_schedule
         self.cell = Cell(
-            delta_time, cell_type, mass, specific_capacity, soc_length=soc_length
+            delta_time, cycling_window, mass, specific_capacity, soc_length=soc_length, initial_soc_state=initial_soc_state
         )
 
     def run_test(self, max_cycles=100, progress_bar = None, timeout = None):
@@ -243,7 +174,6 @@ class Tester:
         if normalize:
             cc = cc / self.cell.nominalCapacity
             dc = dc / self.cell.nominalCapacity
-            c = c / self.cell.nominalCapacity
 
         ci = self.output.PV_CHAN_Cycle_Index
         si = self.output.PV_CHAN_Step_Index
@@ -402,7 +332,7 @@ class Schedule:
         self.current_step = self.steps[0]
         self.update_formula_values_and_limits(cell)
 
-        go_to = self.current_step.execute(cell)
+        go_to = self.current_step.execute(cell, timeout)
 
         while not (
                 go_to == "End Test" or (go_to == "Next Step" and self.current_step is self.steps[-1]) or
@@ -420,7 +350,7 @@ class Schedule:
             if progress_bar is not None:
                 progress_bar.progress(1.0 * cell.current_state["PV_CHAN_Cycle_Index"] / max_cycles, f"Schedule running... (Cycle {cell.current_state['PV_CHAN_Cycle_Index']}/{max_cycles}, step {cell.current_state['PV_CHAN_Step_Index']})")
 
-            go_to = self.current_step.execute(cell)
+            go_to = self.current_step.execute(cell, timeout)
 
     def update_formula_values_and_limits(self, cell):
         for formula in self.formulas.values():
@@ -502,7 +432,7 @@ class Step:
                     self.cRate = self.stepInfo["m_szCtrlValue"]
                 self.current = "null"
                 print("C-rate: ", self.cRate)
-            if self.stepType == "Current(A)":
+            elif self.stepType == "Current(A)":
                 self.cRate = "null"
                 self.current = float(self.stepInfo["m_szCtrlValue"])
                 print("Current: ", self.current)
@@ -534,12 +464,12 @@ class Step:
             print("WARNING! Error in interpretation of step", self.stepIndex)
             raise e
 
-    def execute(self, cell):
+    def execute(self, cell, timeout=None):
         cell.set_step_index(self.stepIndex)
         cell.zero_step_time()
+        print("Running step number", self.stepIndex, "which is a step of type", self.stepType)
 
         if self.stepType == "C-Rate":
-            #            print("Running step number", self.stepIndex, "which is a step of type", self.stepType)
             running = True
             go_to = "End Test"
             while running:
@@ -557,13 +487,16 @@ class Step:
                 if is_triggered:
                     cell.log_state()
                     running = False
+                elif cell.current_state["PV_CHAN_Test_Time"] > timeout:
+                    print("Timeout in step", self.stepIndex)
+                    cell.log_state()
+                    running = False
                 elif self.check_log_limits(cell.current_state):
                     cell.log_state()
 
             return go_to
 
         elif self.stepType == "Current(A)":
-            #            print("Running step number", self.stepIndex, "which is a step of type", self.stepType)
             go_to = "End Test"
             running = True
             while running:
@@ -575,6 +508,10 @@ class Step:
                 is_triggered, go_to = self.check_limits(cell.current_state)
 
                 if is_triggered:
+                    cell.log_state()
+                    running = False
+                elif cell.current_state["PV_CHAN_Test_Time"] > timeout:
+                    print("Timeout in step", self.stepIndex)
                     cell.log_state()
                     running = False
                 elif self.check_log_limits(cell.current_state):
@@ -597,13 +534,16 @@ class Step:
                 if is_triggered:
                     cell.log_state()
                     running = False
+                elif cell.current_state["PV_CHAN_Test_Time"] > timeout:
+                    print("Timeout in step", self.stepIndex)
+                    cell.log_state()
+                    running = False
                 elif self.check_log_limits(cell.current_state):
                     cell.log_state()
 
             return go_to
 
         elif self.stepType == "Rest":
-            #            print("Running step number", self.stepIndex, "which is a step of type", self.stepType)
             go_to = "End Test"
             running = True
             while running:
@@ -617,18 +557,18 @@ class Step:
                 is_triggered, go_to = self.check_limits(cell.current_state)
                 if is_triggered:
                     running = False
+                elif cell.current_state["PV_CHAN_Test_Time"] > timeout:
+                    print("Timeout in step", self.stepIndex)
+                    running = False
 
             return go_to
 
         elif self.stepType == "Internal Resistance":
-            #            print("Running step number", self.stepIndex, "which is a step of type", self.stepType)
             cell.update_internal_resistance()
             cell.log_state()
             return self.limits[0].targetStep
 
         elif self.stepType == "Set Variable(s)":
-            #            print("Running step number", self.stepIndex, "which is a step of type", self.stepType)
-
             zero_array = "{0:32b}".format(int(self.zero))[::-1]
             if zero_array[0] == "1":
                 cell.zero_charge_cap()
@@ -670,21 +610,29 @@ class Step:
             is_triggered, go_to = self.check_limits(cell.current_state)
             if not is_triggered:
                 go_to = "Next Step"
+            elif cell.current_state["PV_CHAN_Test_Time"] > timeout:
+                cell.log_state()
+                print("Timeout in step", self.stepIndex)
+                running = False
 
             return go_to
 
     def check_limits(self, current_state):
         return_bool = False
         return_go_to = ""
+        triggered_limit = None
 
         for limit in self.limits:
             is_triggered, go_to = limit.check_trigger(current_state)
             if is_triggered is True and limit.limitParameter != "PV_CHAN_Step_Time":
+                print(f"Triggered limit: {limit.limitParameter} {limit.limitOperator} {limit.limitValue}, going to {limit.targetStep}")
                 return is_triggered, go_to
             elif is_triggered:
+                triggered_limit = limit
                 return_bool = is_triggered
                 return_go_to = go_to
 
+        
         return return_bool, return_go_to
 
     def check_log_limits(self, current_state):
@@ -744,21 +692,21 @@ class Limit:
 
 
 class Cell:
-    def __init__(self, delta_time, cell_type, mass, specific_capacity, soc_length=20):
+    def __init__(self, delta_time, cycling_window, mass, specific_capacity, soc_length=20, initial_soc_state=1):
         self.soc_length = soc_length
         self.delta_time = delta_time
 
         self.log = []
-        self.voltageResponse = ResponseFunction(cell_type)
+        self.voltageResponse = ResponseFunction(cycling_window)
 
         self.mass = mass
         self.specificCapacity = specific_capacity
         self.nominalCapacity = mass * specific_capacity
         self.currentCapacity = 0
-        self.soc_distribution = [0 for i in range(soc_length)]
+        self.soc_distribution = [initial_soc_state for i in range(soc_length)]
         self.lastPrint = time.time()
         self.lastLogVoltage = 0
-        self.temp_soc_distribution = [0 for i in range(soc_length)]
+        self.temp_soc_distribution = [initial_soc_state for i in range(soc_length)]
         self.crate = None
 
         self.current_state = {
@@ -775,8 +723,6 @@ class Cell:
             "TC_Counter3": 0,
             "TC_Counter4": 0,
             "Internal_Resistance": 0,
-            "Current_Capacity": 0,
-            "Surface_Capacity": 0,
             "Capacity_Profile": 0,
             "Formula_Values": 0,
             "DV_Time": 0,
@@ -785,6 +731,10 @@ class Cell:
             "MV_SpecificCapacity": self.specificCapacity,
         }
 
+        self.fig_state = plt.figure()
+        self.ax_state = self.fig_state.add_subplot()
+        self.counter = 0
+        
     def increment_time(self):
         self.current_state["PV_CHAN_Test_Time"] += self.delta_time
         self.current_state["PV_CHAN_Step_Time"] += self.delta_time
@@ -793,16 +743,15 @@ class Cell:
     def increment_current(self, crate=None, current=None, constant_voltage=None):
         if current == "floating":
             distribution_factor = self.delta_time / 10
-            self.crate = -(
+            self.crate = (
                 (
                     self.voltageResponse.pot_to_soc(constant_voltage)
-                    * self.nominalCapacity
                     - self.soc_distribution[1]
                 )
                 * distribution_factor
-            ) / (self.nominalCapacity * self.delta_time / 3600 * self.soc_length)
+            ) / (self.delta_time / 3600 * self.soc_length)
             self.soc_distribution[0] = (
-                self.voltageResponse.pot_to_soc(constant_voltage) * self.nominalCapacity
+                self.voltageResponse.pot_to_soc(constant_voltage)
             )
         elif current is not None:
             # print('')
@@ -812,13 +761,9 @@ class Cell:
             # print(self.crate)
         else:
             self.crate = crate
-        self.current_state["PV_CHAN_Current"] = self.crate * self.nominalCapacity
-        self.currentCapacity += (
-            -self.crate * self.nominalCapacity * self.delta_time / 3600
-        )
-        self.current_state["Current_Capacity"] = self.currentCapacity
+
+        self.current_state["PV_CHAN_Current"] = self.crate
         self.update_soc_distribution(self.crate)
-        self.current_state["Surface_Capacity"] = self.soc_distribution[0]
 
         if self.crate < 0:
             self.current_state["PV_CHAN_Discharge_Capacity"] += (
@@ -831,8 +776,8 @@ class Cell:
 
     def update_internal_resistance(self):
         self.current_state["Internal_Resistance"] = (
-            1 - self.currentCapacity / self.nominalCapacity
-        ) * 10 + np.random.random() * 5
+            1 - self.currentCapacity
+        )*0.1 + np.random.random() * 0.05
 
     def update_soc_distribution(self, crate):
         distribution_factor = self.delta_time / 10
@@ -845,7 +790,7 @@ class Cell:
 
         self.temp_soc_distribution[0] = (
             self.soc_distribution[0]
-            - crate * self.nominalCapacity * self.delta_time / 3600 * self.soc_length
+            + crate * self.delta_time / 3600 * self.soc_length
             - (self.soc_distribution[0] - self.soc_distribution[1])
             * distribution_factor
         )
@@ -859,7 +804,7 @@ class Cell:
 
     def update_cell_voltage(self):
         nominal_voltage = self.voltageResponse.fast_soc_to_pot(
-            self.soc_distribution[0] / self.nominalCapacity
+            self.soc_distribution[0]
         )
 
         ir_drop = (
@@ -919,3 +864,34 @@ class Cell:
         self.log.append([i for i in self.current_state.values()])
         self.lastLogVoltage = self.current_state["PV_CHAN_Voltage"]
         self.current_state["DV_Time"] = 0
+
+        # if self.counter > 10:
+        #     self.ax_state.plot(self.current_state["Capacity_Profile"])
+        #     plt.pause(.001)
+        #     self.counter = 0
+        # else:
+        #     self.counter += 1
+        
+
+
+if __name__ == "__main__":
+    delta_time=1
+    soc_length=20
+    max_cycles=100
+    timeout=50
+
+    tester = Tester()
+    # tester.set_schedule(filename=r"c:/scripting/ife-bat/st-apps/src/Tilsiktcycling5mV_2021_500cycles-CEF.sdu")
+    tester.set_schedule(filename=r"c:/scripting/ife-bat/st-apps/src/cycling_norsehv_310325+NULL.sdx")
+    tester.build_cell(1.13, 1.000, delta_time=delta_time, soc_length=soc_length, initial_soc_state=0.0)
+    tester.run_test(max_cycles=max_cycles, progress_bar=None, timeout=timeout*3600*24)
+
+    tester.make_overview_bokeh(
+        fig_width=1200*2,
+        fig_height=1200,
+        line_width=1.5,
+        line_alpha=0.9,
+        show_plot=True,
+        normalize=True,
+        vertical_stack=True,
+)

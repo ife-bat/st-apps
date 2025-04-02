@@ -2,15 +2,10 @@ from libs import arbin_schedule_tester_lib as ast
 import streamlit as st
 import bokeh.plotting as bplt
 
-cell_type_options = {"Auto" : None,
-                      "Anode half-cell Si/G" : "half_cell", 
-                      "Anode half-cell XNO/LTO" : "half_cell_XNO", 
-                      "Cathode half-cell LFP" : "full_cell_LFP", 
-                      "Cathode half-cell NMC" : "full_cell_NMC", 
-                      "Full-cell with LFP" : "full_cell_LFP", 
-                      "Full-cell with NMC" : "full_cell_NMC",
-                      "Full-cell with LNMO" : "full_cell_LNMO"
-                        }
+cell_type_options = {"Anode half-cell (initially charged)" : 1.0,
+                      "Cathode half-cell (initially discharged)" : 0.0, 
+                      "Full-cell (initially discharged)" : 0.0, 
+                      }
 
 tester = ast.Tester()
 
@@ -42,6 +37,9 @@ col1, col2 = widget.columns(2)
 # Populate main settings column
 setting_expander = col1.expander("Test parameters", expanded=True)
 cell_type_option = setting_expander.selectbox("Cell type:", cell_type_options.keys())
+capacity = setting_expander.number_input(
+    "Capacity (mAh):", min_value=0.001, max_value=1000000.0, value=2.000
+)
 max_cycles = setting_expander.number_input(
     "Number of cycles to run:", min_value=1, max_value=5000, value=100
 )
@@ -110,7 +108,7 @@ elif uploaded_schedule is not None and button:
     schedule_lines = schedule_text.splitlines()
 
     tester.set_schedule(schedule_lines=schedule_lines)
-    tester.build_cell(0.002, 1.000, delta_time=delta_time, cell_type=cellType, soc_length=soc_length)
+    tester.build_cell(1.0*float(capacity)/1000.0, 1.000, delta_time=delta_time, soc_length=soc_length, initial_soc_state=cellType)
     tester.run_test(max_cycles=max_cycles, progress_bar=progress_bar, timeout=timeout*3600*24)
     
     progress_bar.progress(1.0, "Preparing figure")
