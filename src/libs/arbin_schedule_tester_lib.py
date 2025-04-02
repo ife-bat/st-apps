@@ -317,7 +317,7 @@ class Schedule:
                         self.formula_info_list[-1][key] = value
 
             except UnicodeDecodeError as e:
-                print(f"error in line:\n {f}")
+                print(f"error in line:\n {e}")
                 print(e)
 
     def build_schedule(self):
@@ -408,12 +408,7 @@ class Step:
         self.formulas = formulas
         self.stepInfo = step_info[0]
 
-        for limit_info in step_info[1]:
-            if limit_info["m_bStepLimit"] == "1":
-                self.limits.append(Limit(limit_info, formulas))
-            elif limit_info["m_bLogDataLimit"] == "1":
-                self.log_limits.append(Limit(limit_info, formulas))
-
+        
         self.stepName = self.stepInfo["m_szLabel"]
         self.stepType = self.stepInfo["m_szStepCtrlType"]
         self.stepIndex = self.stepInfo["StepIndex"]
@@ -422,6 +417,13 @@ class Step:
         print("Step index: ", self.stepIndex)
         print("Step name: ", self.stepName)
         print("Step type: ", self.stepType)
+
+        for limit_info in step_info[1]:
+            if limit_info["m_bStepLimit"] == "1":
+                self.limits.append(Limit(limit_info, formulas))
+            elif limit_info["m_bLogDataLimit"] == "1":
+                self.log_limits.append(Limit(limit_info, formulas))
+
 
         try:
             if self.stepType == "C-Rate":
@@ -456,6 +458,10 @@ class Step:
                     self.decrement = int(self.stepInfo["m_szExtCtrlValue2"])
                 else:
                     self.decrement = 0
+            elif self.stepType == "CCCV":
+                self.current = float(self.stepInfo["m_szCtrlValue"])
+                self.voltage = float(self.stepInfo["m_szExtCtrlValue1"])
+                print("CCCV Step - Current:", self.current, "Voltage:", self.voltage)
             else:
                 print("Step-type cannot be determined for step", self.stepIndex)
 
@@ -467,6 +473,43 @@ class Step:
         cell.set_step_index(self.stepIndex)
         cell.zero_step_time()
         print("Running step number", self.stepIndex, "which is a step of type", self.stepType)
+
+        if self.stepType == "CCCV":
+            go_to = "End Test"
+            running = True
+            cc_phase = True  # Start with the constant current phase
+
+            while running:
+                cell.increment_time()
+
+                if cc_phase:
+                    # Constant Current Phase
+                    cell.increment_current(current=self.current)
+                    cell.update_cell_voltage()
+
+                    # Check if voltage limit is reached
+                    if cell.current_state["PV_CHAN_Voltage"] >= self.voltage:
+                        print("Switching to constant voltage phase")
+                        cc_phase = False  # Switch to constant voltage phase
+
+                else:
+                    # Constant Voltage Phase
+                    cell.increment_current(current="floating", constant_voltage=self.voltage)
+                    cell.update_cell_voltage()
+
+                # Check for limits, timeout, or log conditions
+                is_triggered, go_to = self.check_limits(cell.current_state)
+                if is_triggered:
+                    cell.log_state()
+                    running = False
+                elif cell.current_state["PV_CHAN_Test_Time"] > timeout:
+                    print("Timeout in step", self.stepIndex)
+                    cell.log_state()
+                    running = False
+                elif self.check_log_limits(cell.current_state):
+                    cell.log_state()
+
+            return go_to
 
         if self.stepType == "C-Rate":
             running = True
