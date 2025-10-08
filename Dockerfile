@@ -2,7 +2,7 @@ FROM python:3.9-slim-buster
 
 WORKDIR /app
 
-RUN apt update && apt install -y build-essential
+RUN apt-get update
 #     curl \
 #     mdbtools \
 #     git \
