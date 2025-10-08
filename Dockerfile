@@ -8,6 +8,7 @@ RUN apt-get update; \
         curl \
         mdbtools \
         git \
+        software-properties-common \
     ; \
     rm -rf /var/lib/apt/lists/*
 
