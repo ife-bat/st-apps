@@ -1,14 +1,11 @@
-FROM python:3.9-slim
+FROM python:3.9-slim-buster
 
 WORKDIR /app
 
-RUN add-apt-repository universe && \
-    apt-get update && \
-    apt-get install -y \
+RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
     mdbtools \
-    software-properties-common \
     git \
     && rm -rf /var/lib/apt/lists/*
 
