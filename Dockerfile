@@ -2,7 +2,7 @@ FROM python:3.9-slim
 
 WORKDIR /app
 
-RUN  sudo add-apt-repository universe && \
+RUN add-apt-repository universe && \
     apt-get update && \
     apt-get install -y \
     build-essential \
