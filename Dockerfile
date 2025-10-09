@@ -1,16 +1,14 @@
-FROM python:3.13-slim
+FROM python:3.9-slim
 
 WORKDIR /app
 
-RUN apt-get update; \
-    apt-get install -y --no-install-recommends \
-        build-essential \
-        curl \
-        mdbtools \
-        git \
-        software-properties-common \
-    ; \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    mdbtools \
+    software-properties-common \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt /app
 
