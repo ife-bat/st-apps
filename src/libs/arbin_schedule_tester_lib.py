@@ -97,7 +97,10 @@ class Tester:
                     limit["m_bStepLimit"] == "1"
                     and limit["Equation0_szLeft"] == "PV_CHAN_Voltage"
                 ):
-                    cutoffs.append(float(limit["Equation0_szRight"]))
+                    try:
+                        cutoffs.append(float(limit["Equation0_szRight"]))
+                    except ValueError:
+                        cutoffs.append(schedule.formulas[limit["Equation0_szRight"]].get_value())
 
         cycling_window = [min(cutoffs), max(cutoffs)]
         print("Infered cycling window from schedule:", cycling_window)
