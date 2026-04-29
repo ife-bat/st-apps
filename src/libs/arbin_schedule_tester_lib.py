@@ -451,7 +451,10 @@ class Step:
             elif self.stepType == "Voltage(V)":
                 self.cRate = "null"
                 self.current = "floating"
-                self.voltage = float(self.stepInfo["m_szCtrlValue"])
+                try:
+                    self.voltage = float(self.stepInfo["m_szCtrlValue"])
+                except ValueError:
+                    self.voltage = self.formulas[self.stepInfo["m_szCtrlValue"]].get_value()
             elif self.stepType == "Rest":
                 self.cRate = 0
             elif self.stepType == "Set Variable(s)":
