@@ -100,8 +100,11 @@ class Tester:
                     try:
                         cutoffs.append(float(limit["Equation0_szRight"]))
                     except ValueError:
+                        print("Could not convert limit to float:", limit["Equation0_szRight"])
+                        print("Trying to get value from formula. Got:", schedule.formulas[limit["Equation0_szRight"]].get_value())
                         cutoffs.append(schedule.formulas[limit["Equation0_szRight"]].get_value())
 
+        print("Cutoffs found in schedule:", cutoffs)
         cycling_window = [min(cutoffs), max(cutoffs)]
         print("Infered cycling window from schedule:", cycling_window)
         
@@ -171,7 +174,7 @@ class Tester:
 
         dc = self.output.PV_CHAN_Discharge_Capacity
 
-        c = self.output.PV_CHAN_Current
+        c = self.output.C_Rate
 
         if normalize:
             cc = cc / self.cell.nominalCapacity
@@ -384,7 +387,12 @@ class Formula:
                 variable, "current_state['" + variable + "']"
             )
 
-        self.value = 0
+        print("Building formula", self.formula_name, "with expression", self.expression)
+        try:
+            self.update({"TC_Counter1": 0, "TC_Counter2": 0, "TC_Counter3": 0, "TC_Counter4": 0, "PV_CHAN_Cycle_Index": 0, "PV_CHAN_Step_Index": 0, "MV_Mass": 1, "MV_SpecificCapacity": 1})
+        except Exception as e:
+            print(f"Error initializing formula {self.formula_name}: {e}")
+            self.value = 0
 
     def update(self, current_state):
         try:
@@ -757,6 +765,7 @@ class Cell:
         self.current_state = {
             "PV_CHAN_Voltage": 0,
             "PV_CHAN_Current": 0,
+            "C_Rate": self.crate,
             "PV_CHAN_Test_Time": 0,
             "PV_CHAN_Step_Time": 0,
             "PV_CHAN_Cycle_Index": 1,
@@ -803,7 +812,9 @@ class Cell:
         else:
             self.crate = crate
 
-        self.current_state["PV_CHAN_Current"] = self.crate
+        self.current_state["PV_CHAN_Current"] = self.crate*self.nominalCapacity
+        self.current_state["C_Rate"] = self.crate
+        
         self.update_soc_distribution(self.crate)
 
         if self.crate < 0:
